@@ -1,0 +1,22 @@
+# Gradle / Kotlin / IDE outputs
+.gradle/
+.kotlin/
+**/build/
+.idea/
+*.iml
+.DS_Store
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+local.properties
+*.key
+*.pem
+
+# Local runtime data and diagnostics
+.blaise-agent/
+*.log
+*.db
+*.db-shm
+*.db-wal
