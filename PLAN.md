@@ -87,10 +87,14 @@ have not been visually verified. This milestone is not marked complete yet.
 locally, input works, and the UI remains responsive. Temporary demo behavior is
 explicitly labeled until connected to the agent.
 
-### 2. Ollama startup and conversational agent
+### 2. Ollama startup and conversational agent — initial connection delivered
 
-- Check endpoint health with a bounded timeout off the UI thread.
-- Distinguish checking, ready, unreachable, no models, and incompatible model states.
+- [x] Check endpoint health with a bounded timeout off the UI thread.
+- [x] Show a startup toast for reachable/unreachable Ollama and no-model states.
+- [x] Discover models through `GET /api/tags` and use an available model for chat.
+- [x] Connect LangChain4j's streaming Ollama adapter to the chat state.
+- [ ] Distinguish checking, ready, unreachable, and incompatible model states in the
+  persistent application state.
 - Reuse running Ollama. For an unavailable local endpoint, provide an explicit
   start action, detect the binary, invoke `ollama serve` without a shell, and poll
   readiness with a deadline. Handle another process starting it concurrently.
@@ -107,6 +111,11 @@ explicitly labeled until connected to the agent.
   are enabled; an installed model alone is insufficient evidence of compatibility.
 - Connect LangChain4j, stream chat responses, maintain per-conversation memory,
   expose cancellation, and surface connection/model errors.
+
+The initial connection slice uses Retrofit with Kotlin serialization for typed HTTP
+interfaces. This is the HTTP pattern intended for Woovi and future gateways; it
+keeps external API boundaries declarative and testable without adding Spring to the
+desktop application. LangChain4j owns the Ollama chat stream.
 
 **Acceptance:** Existing local Ollama is reused. Offline/missing-model scenarios
 show actionable UI states. The picker reflects API results and refreshes after

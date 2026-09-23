@@ -17,10 +17,12 @@ conversation controls, editable drafts, example prompts, and a Settings screen.
 Conversation orchestration has offline tests for streaming, cancellation, isolation,
 and failure handling behind a replaceable agent interface.
 
-Ollama, LangChain4j, Woovi, credential storage, and conversation persistence are
-**not connected yet**. Sending is disabled; example prompts only fill your draft.
-Settings shows the planned integrations and does not accept API keys. All drafts
-and conversations currently live in memory and disappear when the app closes.
+Ollama health detection, local model discovery, and LangChain4j streaming are now
+connected. On startup the app checks the local Ollama endpoint, shows a toast with
+the result, discovers installed models from `/api/tags`, and uses the first model
+for chat. Model switching, Woovi, credential storage, and conversation persistence
+are not connected yet. Settings shows the current Ollama state; drafts and
+conversations still live in memory and disappear when the app closes.
 
 See [PLAN.md](PLAN.md) for milestones and acceptance criteria and [AGENTS.md](AGENTS.md)
 for development conventions.
@@ -52,8 +54,8 @@ This is the intended experience, not an example of a currently working feature.
 
 - **Kotlin/JVM and Java 21** for the application.
 - **Compose Desktop and Material 3** for the interface.
-- **LangChain4j** for the planned AI service, conversation context, and tool calling.
-- **Ollama** for planned locally hosted inference.
+- **LangChain4j** for the AI service, conversation context, and tool calling.
+- **Ollama** for locally hosted inference.
 - **Woovi sandbox** as the planned first gateway.
 
 Target integration architecture:
@@ -87,8 +89,8 @@ are references for the desktop experience.
 3. If a local service is unavailable, offer a start action using the installed
    `ollama serve` command, plus diagnostics and retry. Remote endpoints receive
    connection diagnostics rather than local process management.
-4. Discover installed models, restore a valid selection, and check tool-call
-   suitability. Offer explicit model selection/download if needed.
+4. Discover installed models and use the first available model for the initial chat.
+   Model selection and tool-call suitability checks are next.
 5. Show Woovi configuration separately, so ordinary chat can work without gateway
    credentials.
 
@@ -101,10 +103,10 @@ store is unavailable or locked, the app will offer session-only use rather than
 silently saving plaintext. Keys must never enter chat history, model context,
 ordinary preferences, exports, or logs.
 
-Ollama settings will load installed models from `GET /api/tags`, display model
-details, and support refresh and saved selection. Switching applies between chat
-requests; payment tools require verified model support. Missing models and
-unreachable endpoints appear as actionable states rather than hard-coded choices.
+Ollama settings load installed models from `GET /api/tags` and display their basic
+details. The startup toast reports whether Ollama is reachable and whether models
+are available. Refresh, saved selection, model switching, and payment-tool
+capability checks are upcoming.
 
 ## Build and run
 

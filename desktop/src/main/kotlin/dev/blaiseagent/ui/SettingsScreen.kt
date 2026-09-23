@@ -27,9 +27,11 @@ import androidx.compose.ui.unit.sp
 import dev.blaiseagent.ui.theme.Border
 import dev.blaiseagent.ui.theme.Muted
 import dev.blaiseagent.ui.theme.Raised
+import dev.blaiseagent.agent.OllamaConnection
+import dev.blaiseagent.agent.OllamaModel
 
 @Composable
-fun SettingsScreen(onBack: () -> Unit) {
+fun SettingsScreen(connection: OllamaConnection?, models: List<OllamaModel>, onBack: () -> Unit) {
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -40,7 +42,15 @@ fun SettingsScreen(onBack: () -> Unit) {
                 Text("Connections and credentials will live here.", color = Muted, fontSize = 14.sp)
             }
             SettingsCard("Ollama", "LOCAL INFERENCE") {
-                Text("Model connection is the next milestone.", color = Muted, fontSize = 14.sp)
+                Text(
+                    when (connection) {
+                        OllamaConnection.Ready -> "Ollama is running. Models are loaded from its local API."
+                        is OllamaConnection.Unavailable -> "Ollama is not reachable. Start it and reopen the app."
+                        null -> "Checking Ollama connection…"
+                    },
+                    color = Muted,
+                    fontSize = 14.sp,
+                )
                 OutlinedTextField(
                     value = "http://127.0.0.1:11434",
                     onValueChange = {},
@@ -49,8 +59,19 @@ fun SettingsScreen(onBack: () -> Unit) {
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                 )
+                if (models.isNotEmpty()) {
+                    Text("Installed models", fontWeight = FontWeight.Medium, fontSize = 13.sp)
+                    models.forEach { model ->
+                        Text(
+                            "${model.name} · ${model.sizeBytes / 1_000_000_000.0} GB" +
+                                (model.family?.let { " · $it" } ?: ""),
+                            color = Muted,
+                            fontSize = 13.sp,
+                        )
+                    }
+                }
                 Text(
-                    "Installed models will load directly from Ollama. You’ll be able to refresh the list and switch models between requests.",
+                    "Installed models load directly from Ollama. Model switching and refresh controls arrive with the next agent slice.",
                     color = Muted,
                     fontSize = 13.sp,
                     lineHeight = 21.sp,

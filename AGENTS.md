@@ -49,6 +49,9 @@ dependency or a required local checkout.
   Test credential replacement/removal, precedence, and sanitized error paths.
 - Check Ollama asynchronously at startup, reuse existing instances, and never stop
   a service the app does not own. Model downloads must be explicit user actions.
+- Use typed declarative HTTP clients for external APIs. Retrofit with Kotlin
+  serialization is the current desktop choice; keep service interfaces separate
+  from gateway/domain mapping and sanitize transport errors.
 - Populate model choices from Ollama's API, not a hard-coded list. Refresh choices,
   handle removed models, and apply switches only between requests. Verify tool-call
   suitability before enabling payment tools for a selected model.

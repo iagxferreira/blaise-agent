@@ -21,11 +21,14 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -39,6 +42,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.blaiseagent.state.ChatState
 import dev.blaiseagent.state.ChatViewModel
+import dev.blaiseagent.agent.OllamaChatAgent
+import dev.blaiseagent.agent.OllamaClient
+import dev.blaiseagent.agent.OllamaConnection
+import dev.blaiseagent.agent.OllamaModel
 import dev.blaiseagent.ui.theme.Accent
 import dev.blaiseagent.ui.theme.Background
 import dev.blaiseagent.ui.theme.BlaiseTheme
@@ -48,13 +55,39 @@ import dev.blaiseagent.ui.theme.Raised
 import dev.blaiseagent.ui.theme.Sidebar
 
 @Composable
-fun App(model: ChatViewModel) {
+fun App(model: ChatViewModel, ollamaClient: OllamaClient) {
     val state by model.state.collectAsState()
     var settingsOpen by remember { mutableStateOf(false) }
+    var ollamaConnection by remember { mutableStateOf<OllamaConnection?>(null) }
+    var models by remember { mutableStateOf<List<OllamaModel>>(emptyList()) }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(ollamaClient) {
+        val connection = ollamaClient.checkConnection()
+        ollamaConnection = connection
+        when (connection) {
+            OllamaConnection.Ready -> {
+                models = runCatching { ollamaClient.listModels() }.getOrDefault(emptyList())
+                val firstModel = models.firstOrNull()
+                if (firstModel == null) {
+                    model.setAgent(null)
+                    snackbarHostState.showSnackbar("Ollama is running, but no local models are installed")
+                } else {
+                    model.setAgent(OllamaChatAgent(ollamaClient.endpoint, firstModel.name))
+                    snackbarHostState.showSnackbar("Ollama is running · ${models.size} model${if (models.size == 1) "" else "s"} available")
+                }
+            }
+            is OllamaConnection.Unavailable -> {
+                model.setAgent(null)
+                snackbarHostState.showSnackbar("Ollama is not running · start it and restart or retry")
+            }
+        }
+    }
 
     BlaiseTheme {
-        Surface(Modifier.fillMaxSize(), color = Background) {
-            Row {
+        Box(Modifier.fillMaxSize().background(Background)) {
+            Surface(Modifier.fillMaxSize(), color = Background) {
+                Row {
                 Sidebar(
                     state = state,
                     settingsOpen = settingsOpen,
@@ -79,7 +112,7 @@ fun App(model: ChatViewModel) {
                     }
                     HorizontalDivider()
                     if (settingsOpen) {
-                        SettingsScreen(onBack = { settingsOpen = false })
+                        SettingsScreen(ollamaConnection, models, onBack = { settingsOpen = false })
                     } else {
                         ChatScreen(state, model::updateDraft, model::send, model::cancelResponse) {
                             settingsOpen = true
@@ -87,6 +120,11 @@ fun App(model: ChatViewModel) {
                     }
                 }
             }
+            }
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 18.dp),
+            )
         }
     }
 }

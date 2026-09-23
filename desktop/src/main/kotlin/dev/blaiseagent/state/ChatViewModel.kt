@@ -17,9 +17,10 @@ import java.util.UUID
 
 /** UI-owned state. Call actions on the UI dispatcher and close with the window. */
 class ChatViewModel(
-    private val agent: ChatAgent? = null,
+    agent: ChatAgent? = null,
     dispatcher: CoroutineDispatcher = Dispatchers.Main.immediate,
 ) : AutoCloseable {
+    private var agent: ChatAgent? = agent
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
     private val initialConversation = Conversation(UUID.randomUUID().toString())
     private val mutableState = MutableStateFlow(
@@ -31,6 +32,11 @@ class ChatViewModel(
 
     fun updateDraft(text: String) {
         updateConversation(state.value.activeConversationId) { it.copy(draft = text) }
+    }
+
+    fun setAgent(agent: ChatAgent?) {
+        this.agent = agent
+        mutableState.update { it.copy(agentAvailable = agent != null) }
     }
 
     fun send() {

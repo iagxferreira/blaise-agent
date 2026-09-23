@@ -7,11 +7,13 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import dev.blaiseagent.state.ChatViewModel
+import dev.blaiseagent.agent.OllamaClient
 import dev.blaiseagent.ui.App
 import java.awt.Dimension
 
 fun main() = application {
     val model = remember { ChatViewModel() }
+    val ollamaClient = remember { OllamaClient() }
     DisposableEffect(model) {
         onDispose { model.close() }
     }
@@ -24,6 +26,6 @@ fun main() = application {
             window.minimumSize = Dimension(900, 640)
             onDispose { }
         }
-        App(model)
+        App(model, ollamaClient)
     }
 }
