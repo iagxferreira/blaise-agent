@@ -20,9 +20,9 @@ and failure handling behind a replaceable agent interface.
 Ollama health detection, local model discovery, model switching, and LangChain4j
 streaming are now connected. On startup the app checks the local Ollama endpoint,
 shows a toast with the result, discovers installed models from `/api/tags`, and
-uses the selected model for chat. Woovi, credential storage, and conversation
-persistence are not connected yet. Drafts and conversations still live in memory
-and disappear when the app closes.
+uses the selected model for chat. Woovi connection checks and Linux OS-backed
+credential storage are connected. Charge creation and status lookup are not yet
+implemented. Drafts and conversations live in memory and disappear when the app closes.
 
 The sidebar can collapse from a 248 px conversation list to a 72 px icon rail.
 Use the chevron to expand it, or the Conversations icon to reopen the list.
@@ -82,9 +82,9 @@ Payment links and statuses come from gateway responses. Gateway credentials stay
 in the adapter configuration, outside model context. Local inference still requires
 network access to Woovi for payment operations.
 
-The project uses one Gradle application under `desktop/`. The scaffold contains
-`ui`, `state`, and the `agent` interface; `payments`, `config`, and `storage` will
-arrive with their implementations. The Compose Desktop structure
+The project uses one Gradle application under `desktop/`, with `ui`, `state`,
+`agent`, `payments`, and `config` packages. The `storage` package is planned.
+The Compose Desktop structure
 and restrained dark theme of [MindGraph](https://github.com/iagxferreira/mindgraph)
 are references for the desktop experience.
 
@@ -101,13 +101,13 @@ are references for the desktop experience.
 5. Show Woovi configuration separately, so ordinary chat can work without gateway
    credentials.
 
-## Planned settings and secure storage
+## Settings and secure storage
 
-The Settings screen will offer a masked Woovi API-key field with save, replace,
-remove, and test-connection actions. Saved keys belong in the OS credential store:
-Linux Secret Service, macOS Keychain, or Windows Credential Manager. If the secure
-store is unavailable or locked, the app will offer session-only use rather than
-silently saving plaintext. Keys must never enter chat history, model context,
+Settings offers a masked Woovi API-key field with save, replace, remove, and
+test-connection actions. Linux Secret Service is implemented via `secret-tool`;
+macOS Keychain, Windows Credential Manager, and session-only credential input are
+planned. Unavailable secure storage is reported without a plaintext fallback.
+Keys must never enter chat history, model context,
 ordinary preferences, exports, or logs.
 
 Ollama settings provide an editable endpoint, a Test connection action, dynamic
@@ -132,6 +132,35 @@ model to "test my connection with the Woovi environment". The model can request 
 the fixed, no-argument connection tool; environment selection and credential access
 remain controlled by the application.
 
+The agent now executes only native structured tool calls. JSON written in ordinary
+model text is not executable. Each turn allows one validated, no-argument Woovi
+check followed by a model response with tools disabled. Streaming text comes from
+the model; application failures are surfaced through the response status. The
+versioned base instructions live in `agent/PromptComposer.kt`.
+
+If a model returns a JSON tool description as ordinary text, the completed response
+shows an APP notice with expandable original model output. No tool is executed by
+this text, and the unsuccessful assistant response is excluded from future context.
+Ollama's advertised `tools` capability alone is not proof of working native calls.
+
+Conversation context retains paired native tool requests/results with call IDs,
+while excluding cancelled or failed assistant text. Older turns are evicted whole
+using a 24,000-character history budget; the latest turn is retained even if it
+exceeds that budget. This is not a model-specific token limit. Conversation
+persistence and explicit global preferences remain planned; chats are session-only.
+
+The composer includes an expandable context preview showing included turns, tool
+results, history character usage, and excluded older turns. It includes the current
+draft and is a preview, not a record of a request already sent. Tool calls and their
+paired results appear as one expandable card. Cards distinguish running, result
+received, and stopped without a recorded result; provider success/failure remains
+in the result details until typed outcome presentation is implemented.
+
+Responses show live elapsed waiting time and retain total duration on completion,
+failure, or cancellation. Tool cards retain their own execution duration, excluding
+model generation before and after the tool. Durations use a monotonic clock and
+remain in session memory only; they are not sent to the model.
+
 ## Build and run
 
 Install **JDK 21** and point `JAVA_HOME` to it. The Gradle wrapper is checked in;
@@ -148,13 +177,28 @@ From the repository root:
 
 Or, from `desktop/`, use `./gradlew build`, `./gradlew test`, and `./gradlew run`.
 The first build downloads Gradle and Maven dependencies. Running the UI requires a
-graphical desktop session. The current app and tests need neither Ollama nor Woovi
-credentials and do not call external APIs.
+graphical desktop session. Offline tests need neither Ollama nor Woovi credentials.
+Chat requires a running Ollama instance; connection checks contact Woovi using the
+selected environment's saved credential.
 
 Test reports are generated in `desktop/build/reports/tests/test/index.html`.
 
-For future live-model checks, use an Ollama model verified with the project's
-tool-calling smoke test once that integration lands.
+### Local model setup
+
+On the development machine (Xeon E5-2690 v4, 32 GB RAM, GTX 1050 Ti 4 GB),
+`qwen3:4b` completed a native tool-call probe and a synthetic result follow-up
+through Ollama with thinking enabled and a 4,096-token context. The user also
+demonstrated a Woovi check in Blaise. These observations are not a guarantee for
+other configurations; automatic model compatibility verification is still pending.
+
+```sh
+ollama pull qwen3:4b
+```
+
+Refresh models in Settings and select the downloaded model. Downloads are explicit;
+Blaise does not automatically install models. The app currently uses adapter defaults
+for thinking and token context; its character history budget is a separate limit.
+`qwen2.5-coder:3b` returned JSON prose rather than a native call in the local probe.
 
 For gateway testing, create a separate account at
 [Woovi sandbox](https://app.woovi-sandbox.com/) and obtain sandbox API credentials.

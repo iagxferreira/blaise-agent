@@ -8,6 +8,10 @@ data class ChatMessage(
     val role: MessageRole,
     val text: String,
     val status: MessageStatus = MessageStatus.Complete,
+    val toolCallId: String? = null,
+    val toolName: String? = null,
+    val applicationNotice: String? = null,
+    val elapsedMillis: Long? = null,
 )
 
 data class Conversation(

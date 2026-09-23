@@ -27,6 +27,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.material3.TextButton
+import dev.blaiseagent.agent.ConversationContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
@@ -76,10 +82,26 @@ fun ChatScreen(
                 verticalArrangement = Arrangement.spacedBy(20.dp),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 28.dp),
             ) {
-                items(conversation.messages, key = { it.id }) { Message(it) }
+                items(conversation.messages, key = { it.id }) { message ->
+                    val result = if (message.status == MessageStatus.ToolCall && message.toolCallId != null) {
+                        conversation.messages.firstOrNull {
+                            it.status == MessageStatus.ToolResult && it.toolCallId == message.toolCallId
+                        }
+                    } else null
+                    val pairedResult = message.status == MessageStatus.ToolResult && message.toolCallId != null &&
+                        conversation.messages.any { it.status == MessageStatus.ToolCall && it.toolCallId == message.toolCallId }
+                    when {
+                        message.status == MessageStatus.ToolCall -> ToolActivityCard(
+                            message, result, state.generatingConversationId == conversation.id &&
+                                conversation.messages.indexOf(message) > conversation.messages.indexOfLast { it.role == MessageRole.User },
+                        )
+                        !pairedResult -> Message(message)
+                    }
+                }
             }
         }
         Column(Modifier.widthIn(max = 840.dp).fillMaxWidth().padding(horizontal = 32.dp, vertical = 20.dp)) {
+            ContextDisclosure(conversation.messages, conversation.draft)
             Surface(shape = RoundedCornerShape(16.dp), color = Raised, border = BorderStroke(1.dp, Border)) {
                 Column(Modifier.fillMaxWidth().padding(16.dp)) {
                     BasicTextField(
@@ -128,6 +150,57 @@ fun ChatScreen(
 }
 
 @Composable
+private fun ContextDisclosure(messages: List<ChatMessage>, draft: String) {
+    var expanded by remember { mutableStateOf(false) }
+    val candidate = if (draft.isBlank()) messages else messages +
+        ChatMessage("context-preview", MessageRole.User, draft.trim())
+    val included = ConversationContext.select(candidate)
+    val turns = included.count { it.role == MessageRole.User }
+    val characters = included.sumOf { it.text.length }
+    val excluded = candidate.count { it.role == MessageRole.User } - turns
+    TextButton(onClick = { expanded = !expanded }) {
+        Text("Context: $turns turns · $characters / 24,000 chars ${if (expanded) "▴" else "▾"}", fontSize = 12.sp)
+    }
+    if (expanded) {
+        Surface(color = Raised, shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, Border)) {
+            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("Context for next request", fontWeight = FontWeight.Medium)
+                Text("$turns included turns · ${included.count { it.status == MessageStatus.ToolResult }} tool results", fontSize = 12.sp)
+                Text("$excluded older turns not sent to model", color = Muted, fontSize = 12.sp)
+                Text("Cancelled and failed assistant text is excluded. History remains visible in this session.", color = Muted, fontSize = 12.sp)
+                if (characters > 24_000) Text("Latest turn exceeds the history budget; it will be retained whole.", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
+                Text("History characters only; system instructions and tool schemas are additional.", color = Muted, fontSize = 12.sp)
+                Text("Session only · Global preferences are not implemented", color = Muted, fontSize = 12.sp)
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+    }
+}
+
+@Composable
+private fun ToolActivityCard(call: ChatMessage, result: ChatMessage?, generating: Boolean) {
+    var expanded by remember(call.id) { mutableStateOf(false) }
+    val status = when {
+        result != null -> "Result received"
+        generating -> "Running"
+        else -> "Stopped · no result recorded"
+    }
+    Surface(color = Raised, shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, Border)) {
+        Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("TOOL · $status${call.elapsedMillis?.let { " · ${formatElapsed(it)}" }.orEmpty()}", color = Muted, fontSize = 10.sp)
+            TextButton(onClick = { expanded = !expanded }) {
+                Text("${call.toolName ?: "Tool activity"} ${if (expanded) "▴" else "▾"}")
+            }
+            if (expanded) {
+                androidx.compose.foundation.text.selection.SelectionContainer {
+                    Text(result?.text ?: "No result available yet.", fontSize = 13.sp, lineHeight = 20.sp)
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun Welcome(onDraft: (String) -> Unit, modifier: Modifier) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(18.dp)) {
         BrandMark()
@@ -164,28 +237,49 @@ private fun Suggestion(title: String, subtitle: String, prompt: String, onDraft:
 
 @Composable
 private fun Message(message: ChatMessage) {
+    var showDiagnostics by remember(message.id) { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
             when (message.status) {
                 MessageStatus.ToolCall, MessageStatus.ToolResult -> "TOOL"
-                else -> if (message.role == MessageRole.User) "YOU" else "BLAISE"
+                else -> if (message.applicationNotice != null) "APP" else if (message.role == MessageRole.User) "YOU" else "BLAISE"
             },
             color = if (message.status == MessageStatus.ToolResult) Accent else Muted,
             fontSize = 10.sp,
             letterSpacing = 1.sp,
         )
-        if (message.text.isNotEmpty()) {
+        message.applicationNotice?.let { notice ->
+            Text(notice, fontSize = 13.sp, color = MaterialTheme.colorScheme.error)
+            TextButton(onClick = { showDiagnostics = !showDiagnostics }) {
+                Text(if (showDiagnostics) "Hide model output" else "Show model output")
+            }
+        }
+        if (message.text.isNotEmpty() && (message.applicationNotice == null || showDiagnostics)) {
             androidx.compose.foundation.text.selection.SelectionContainer {
                 Text(message.text, fontSize = 15.sp, lineHeight = 24.sp)
             }
         }
         when (message.status) {
-            MessageStatus.Streaming -> Text("Writing…", color = Muted, fontSize = 12.sp)
+            MessageStatus.Streaming -> Text("${if (message.text.isEmpty()) "Waiting for model / tools" else "Responding"} · ${formatElapsed(message.elapsedMillis ?: 0)}", color = Muted, fontSize = 12.sp)
             MessageStatus.ToolCall -> Text("Running securely…", color = Muted, fontSize = 12.sp)
             MessageStatus.ToolResult -> Unit
             MessageStatus.Cancelled -> Text("Response stopped", color = Muted, fontSize = 12.sp)
-            MessageStatus.Failed -> Text("Couldn’t finish this response. Please try again.", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
+            MessageStatus.Failed -> if (message.applicationNotice == null) Text("Couldn’t finish this response. Please try again.", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
             MessageStatus.Complete -> Unit
         }
+        if (message.status != MessageStatus.Streaming && message.elapsedMillis != null) {
+            Text("Total elapsed · ${formatElapsed(message.elapsedMillis)}", color = Muted, fontSize = 12.sp)
+        }
+    }
+}
+
+private fun formatElapsed(milliseconds: Long): String {
+    val minutes = milliseconds / 60_000
+    val seconds = (milliseconds / 1_000) % 60
+    val millis = milliseconds % 1_000
+    return when {
+        minutes > 0 -> "${minutes}m ${seconds}s ${millis}ms"
+        milliseconds >= 1_000 -> "${seconds}s ${millis}ms"
+        else -> "${millis}ms"
     }
 }

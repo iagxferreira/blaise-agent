@@ -20,6 +20,48 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChatViewModelTest {
     @Test
+    fun toolDurationExcludesModelWaitBeforeAndAfterExecution() = runTest {
+        val agent = object : ChatAgent {
+            override fun stream(messages: List<ChatMessage>) = flowOf("unused")
+            override fun streamEvents(messages: List<ChatMessage>) = flow {
+                kotlinx.coroutines.delay(1_000)
+                emit(AgentEvent.ToolCall("test_woovi_connection", "call"))
+                kotlinx.coroutines.delay(2_000)
+                emit(AgentEvent.ToolResult("test_woovi_connection", "Success", "call"))
+                kotlinx.coroutines.delay(3_000)
+                emit(AgentEvent.Text("Done"))
+            }
+        }
+        ChatViewModel(agent, StandardTestDispatcher(testScheduler), { testScheduler.currentTime }).use { model ->
+            model.updateDraft("Check Woovi")
+            model.send()
+            testScheduler.advanceTimeBy(6_001)
+            runCurrent()
+            val messages = model.state.value.activeConversation.messages
+            assertEquals(2_000L, messages.single { it.status == MessageStatus.ToolCall }.elapsedMillis)
+            assertEquals(6_000L, messages.last().elapsedMillis)
+        }
+    }
+
+    @Test
+    fun elapsedTimeUpdatesWhileWaitingAndFreezesAfterCancellation() = runTest {
+        val agent = ChatAgent { flow { awaitCancellation() } }
+        ChatViewModel(agent, StandardTestDispatcher(testScheduler), { testScheduler.currentTime }).use { model ->
+            model.updateDraft("Hello")
+            model.send()
+            testScheduler.advanceTimeBy(2_000)
+            runCurrent()
+            assertEquals(2_000L, model.state.value.activeConversation.messages.last().elapsedMillis)
+            model.cancelResponse()
+            runCurrent()
+            testScheduler.advanceTimeBy(3_000)
+            runCurrent()
+            assertEquals(2_000L, model.state.value.activeConversation.messages.last().elapsedMillis)
+            assertEquals(MessageStatus.Cancelled, model.state.value.activeConversation.messages.last().status)
+        }
+    }
+
+    @Test
     fun unavailableAgentKeepsTheDraftWithoutCreatingMessages() = runTest {
         ChatViewModel(dispatcher = StandardTestDispatcher(testScheduler)).use { model ->
             model.updateDraft("Create a payment link")

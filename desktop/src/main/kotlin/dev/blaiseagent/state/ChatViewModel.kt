@@ -2,6 +2,7 @@ package dev.blaiseagent.state
 
 import dev.blaiseagent.agent.ChatAgent
 import dev.blaiseagent.agent.AgentEvent
+import dev.blaiseagent.agent.ConversationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -10,6 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -20,6 +22,7 @@ import java.util.UUID
 class ChatViewModel(
     agent: ChatAgent? = null,
     dispatcher: CoroutineDispatcher = Dispatchers.Main.immediate,
+    private val clockMillis: () -> Long = { System.nanoTime() / 1_000_000 },
 ) : AutoCloseable {
     private var agent: ChatAgent? = agent
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
@@ -48,8 +51,8 @@ class ChatViewModel(
         if (closed || text.isBlank() || snapshot.generatingConversationId != null) return
 
         val userMessage = ChatMessage(UUID.randomUUID().toString(), MessageRole.User, text)
-        val reply = ChatMessage(UUID.randomUUID().toString(), MessageRole.Assistant, "", MessageStatus.Streaming)
-        val context = conversation.messages.filter { it.status == MessageStatus.Complete } + userMessage
+        val reply = ChatMessage(UUID.randomUUID().toString(), MessageRole.Assistant, "", MessageStatus.Streaming, elapsedMillis = 0)
+        val context = ConversationContext.select(conversation.messages + userMessage)
         updateConversation(conversation.id) {
             it.copy(
                 title = if (it.messages.isEmpty()) text.lineSequence().first().take(48) else it.title,
@@ -61,26 +64,54 @@ class ChatViewModel(
 
         // Enter the try/finally before returning, so immediate cancellation also cleans up state.
         responseJob = scope.launch(start = CoroutineStart.UNDISPATCHED) {
+            val started = clockMillis()
+            var toolStarted = 0L
+            var activeToolMessageId: String? = null
+            fun updateTiming() {
+                val now = clockMillis()
+                updateMessage(conversation.id, reply.id) { it.copy(elapsedMillis = (now - started).coerceAtLeast(0)) }
+                activeToolMessageId?.let { id ->
+                    updateMessage(conversation.id, id) { it.copy(elapsedMillis = (now - toolStarted).coerceAtLeast(0)) }
+                }
+            }
+            val ticker = launch {
+                while (true) {
+                    delay(250)
+                    updateTiming()
+                }
+            }
             try {
                 currentAgent.streamEvents(context).collect { event ->
                     when (event) {
+                        is AgentEvent.Notice -> updateMessage(conversation.id, reply.id) {
+                            it.copy(applicationNotice = event.value)
+                        }
                         is AgentEvent.Text -> updateMessage(conversation.id, reply.id) {
                             it.copy(text = it.text + event.value)
                         }
-                        is AgentEvent.ToolCall -> insertBeforeMessage(
+                        is AgentEvent.ToolCall -> {
+                            toolStarted = clockMillis()
+                            val toolMessageId = UUID.randomUUID().toString()
+                            activeToolMessageId = toolMessageId
+                            insertBeforeMessage(
                             conversation.id,
                             reply.id,
-                            ChatMessage(UUID.randomUUID().toString(), MessageRole.Assistant, "Calling ${event.name}…", MessageStatus.ToolCall),
+                            ChatMessage(toolMessageId, MessageRole.Assistant, "Calling ${event.name}…", MessageStatus.ToolCall, event.callId, event.name, elapsedMillis = 0),
                         )
-                        is AgentEvent.ToolResult -> insertBeforeMessage(
+                        }
+                        is AgentEvent.ToolResult -> {
+                            updateTiming()
+                            activeToolMessageId = null
+                            insertBeforeMessage(
                             conversation.id,
                             reply.id,
-                            ChatMessage(UUID.randomUUID().toString(), MessageRole.Assistant, event.value, MessageStatus.ToolResult),
+                            ChatMessage(UUID.randomUUID().toString(), MessageRole.Assistant, event.value, MessageStatus.ToolResult, event.callId, event.name),
                         )
+                        }
                     }
                 }
                 updateMessage(conversation.id, reply.id) {
-                    it.copy(status = if (it.text.isBlank()) MessageStatus.Failed else MessageStatus.Complete)
+                    it.copy(status = if (it.text.isBlank() || it.applicationNotice != null) MessageStatus.Failed else MessageStatus.Complete)
                 }
             } catch (cancelled: CancellationException) {
                 updateMessage(conversation.id, reply.id) { it.copy(status = MessageStatus.Cancelled) }
@@ -89,6 +120,8 @@ class ChatViewModel(
                 // Transport exceptions can contain request details; UI state gets only a typed failure.
                 updateMessage(conversation.id, reply.id) { it.copy(status = MessageStatus.Failed) }
             } finally {
+                ticker.cancel()
+                updateTiming()
                 mutableState.update { it.copy(generatingConversationId = null) }
             }
         }

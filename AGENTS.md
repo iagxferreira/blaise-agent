@@ -7,8 +7,9 @@ Ollama inference. Woovi sandbox Pix charge creation, payment links, and charge-s
 lookup form the first end-to-end flow.
 
 Read `README.md` and `PLAN.md` before making changes. The repository currently has a
-runnable desktop shell and tested in-memory conversation orchestration. Ollama,
-LangChain4j, Woovi, credential storage, and persistence are not integrated yet.
+runnable desktop shell, Ollama/LangChain4j chat, native Woovi connection checks,
+Linux Secret Service credentials, and tested session-only conversation context.
+Payment creation, persistence, and global preferences are not implemented yet.
 Follow the milestone acceptance criteria and keep status accurate.
 
 ## Intended structure
@@ -28,6 +29,13 @@ justify them. Use the MindGraph desktop project as a reference, not as a runtime
 dependency or a required local checkout.
 
 ## Engineering rules
+
+- Keep native tool requests/results paired by call ID in conversation context.
+  Text shaped like tool JSON is diagnostic data, never executable input.
+- Keep prompt policy in the versioned `PromptComposer`; application notices must
+  remain distinct from model text. Prompts do not replace Kotlin validation.
+- Context currently uses whole-turn character budgeting, not token accounting.
+  Timings use a monotonic clock and remain session-only UI metadata.
 
 - Standard Kotlin style: four spaces, `camelCase` members, `PascalCase` types.
 - Prefer explicit immutable models, constructor injection, and testable functions.

@@ -13,7 +13,8 @@ fun interface ChatAgent {
 }
 
 sealed interface AgentEvent {
+    data class Notice(val value: String) : AgentEvent
     data class Text(val value: String) : AgentEvent
-    data class ToolCall(val name: String) : AgentEvent
-    data class ToolResult(val name: String, val value: String) : AgentEvent
+    data class ToolCall(val name: String, val callId: String? = null) : AgentEvent
+    data class ToolResult(val name: String, val value: String, val callId: String? = null) : AgentEvent
 }

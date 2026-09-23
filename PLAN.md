@@ -75,10 +75,9 @@ with scoped commits and no credentials or generated artifacts.
 - [ ] Manually review the running UI, including keyboard input, sidebar collapse,
   hover/focus states, and window resizing.
 
-The foundation has a runnable shell and eight passing offline conversation-state
-tests. Ollama and LangChain4j now provide local streaming chat; Woovi, credential
-storage, and persistence are not integrated. Settings does not accept or persist
-credentials yet.
+The foundation has a runnable shell and offline conversation-state tests.
+Ollama/LangChain4j chat, Woovi connection checks, and Linux secure credentials are
+integrated. Conversation persistence and payment creation remain unimplemented.
 
 Local build/test and process startup were verified with JDK 21. The new sidebar and
 control states have Pencil references, but live keyboard, pointer, and resize review
@@ -105,6 +104,28 @@ compilation and Pencil validation do not replace that manual check.
 - [x] Separate Woovi Sandbox and Live environment selection and credential slots.
 - [x] Test saved Woovi credentials through the selected environment's company endpoint.
 - [x] Expose the saved-key connection check as a guarded LangChain tool.
+- [x] Replace text-to-tool execution and recursive callbacks with a bounded native
+  tool turn; test streaming and model/tool/result continuation offline.
+- [ ] Verify the selected live model's native tool behavior and cancellation.
+  - Direct local probe: `qwen2.5-coder:3b` advertised `tools` but returned a
+    harmless `connection_probe` call in `message.content`, without native
+    `tool_calls`. No Woovi credential or gateway request was involved. This model
+    has not passed native tool verification. Text-call failures now show APP
+    diagnostics and do not enter subsequent assistant context.
+- [ ] Persist typed conversation exchanges and settings, then add bounded context
+  and explicit user-managed global preferences. Keep operational state separate.
+- [x] Preserve tool call IDs and reconstruct paired tool evidence in subsequent
+  requests; bound recent history by whole turns using a character budget.
+- [ ] Add model-specific token accounting and an explicit oversized-turn policy.
+- [x] Add a composer context preview and expandable paired tool-result cards.
+- [x] Track response and tool elapsed durations with a monotonic clock; display
+  minutes, seconds, and milliseconds. Durations are session-only.
+- Local Qwen3 4B verification: native probe and synthetic result follow-up passed
+  directly through Ollama (thinking enabled, 4,096-token context). User screenshots
+  show a real app Woovi connection result, expanded card, and elapsed durations.
+  This does not verify transport cancellation or all UI interaction states.
+- [ ] Visually verify context disclosures and tool cards in the running desktop app;
+  introduce typed outcome badges and immutable request-detail snapshots.
 - [x] Connect LangChain4j's streaming Ollama adapter to the chat state.
 - [ ] Distinguish checking, ready, unreachable, and incompatible model states in the
   persistent application state.
