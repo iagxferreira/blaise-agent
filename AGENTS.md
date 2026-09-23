@@ -6,13 +6,15 @@ Build a Kotlin/Compose Desktop financial assistant using LangChain4j and local
 Ollama inference. Woovi sandbox Pix charge creation, payment links, and charge-status
 lookup form the first end-to-end flow.
 
-Read `README.md` and `PLAN.md` before making changes. The repository is currently
-documentation-only: do not claim build commands or implemented features exist until
-the scaffold lands. Follow the milestone acceptance criteria and keep status accurate.
+Read `README.md` and `PLAN.md` before making changes. The repository currently has a
+runnable desktop shell and tested in-memory conversation orchestration. Ollama,
+LangChain4j, Woovi, credential storage, and persistence are not integrated yet.
+Follow the milestone acceptance criteria and keep status accurate.
 
 ## Intended structure
 
-The application will live under `desktop/`, with package `dev.blaiseagent`:
+The application lives under `desktop/`, with package `dev.blaiseagent`. Packages
+are introduced as their implementations land:
 
 - `ui/`: composables and presentation only.
 - `state/`: UI-facing state and orchestration.
@@ -71,13 +73,23 @@ decisions in the commit body or relevant documentation.
 
 ## Verification
 
-Before scaffolding, validate documentation links, consistency, staged content, and
-`git diff --check`. There are no application tests yet.
+Use JDK 21 for both Gradle and compilation (`JAVA_HOME` must point to JDK 21).
+From the repository root, verified commands are:
 
-During scaffolding, check in a Gradle wrapper and document the actual build/run/test
-commands here and in the README. Use `kotlin.test` and coroutine test utilities where
-appropriate. Default tests must run without Ollama, gateway credentials, or external
-network APIs.
+```sh
+./desktop/gradlew -p desktop build
+./desktop/gradlew -p desktop test
+./desktop/gradlew -p desktop run
+```
+
+The equivalent commands inside `desktop/` are `./gradlew build`, `./gradlew test`,
+and `./gradlew run`. Gradle 8.11.1 is pinned with a distribution checksum. The UI
+needs a graphical session; tests do not. Dependencies may download on a first build.
+
+Use `kotlin.test` and coroutine test utilities. Default tests must run without
+Ollama, gateway credentials, or external network APIs. CI runs `build` on Linux/JDK
+21; its remote execution must be verified separately from local checks. Also check
+documentation consistency and `git diff --check`.
 
 Prioritize behavioral tests for money validation, tool dispatch, state transitions,
 Woovi HTTP mapping/errors, persistence, and duplicate/uncertain operation handling.

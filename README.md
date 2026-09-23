@@ -2,20 +2,28 @@
 
 **Financial operations through conversation, powered by local AI.**
 
-Blaise Agent is a planned Kotlin desktop application that connects a ChatGPT-style
-chat to payment gateways through LangChain4j and Ollama. The first integration is
-**Woovi's sandbox**, focused on creating Pix charges, returning payment links, and
-checking charge status.
+Blaise Agent is an early Kotlin desktop application being built to connect a
+ChatGPT-style chat to payment gateways through LangChain4j and Ollama. The first
+planned integration is **Woovi's sandbox**, focused on creating Pix charges,
+returning payment links, and checking charge status.
 
 The name honors Blaise Pascal, who invented the Pascaline to help his father with
 tax calculations.
 
 ## Project status
 
-**Planning stage.** This repository currently contains the project direction and
-contribution guidelines. The desktop application and gateway integration are not
-implemented yet. See [PLAN.md](PLAN.md) for milestones and acceptance criteria and
-[AGENTS.md](AGENTS.md) for development conventions.
+**Desktop foundation.** The app now launches with a dark chat workspace, new/switch
+conversation controls, editable drafts, example prompts, and a Settings screen.
+Conversation orchestration has offline tests for streaming, cancellation, isolation,
+and failure handling behind a replaceable agent interface.
+
+Ollama, LangChain4j, Woovi, credential storage, and conversation persistence are
+**not connected yet**. Sending is disabled; example prompts only fill your draft.
+Settings shows the planned integrations and does not accept API keys. All drafts
+and conversations currently live in memory and disappear when the app closes.
+
+See [PLAN.md](PLAN.md) for milestones and acceptance criteria and [AGENTS.md](AGENTS.md)
+for development conventions.
 
 ## The first experience
 
@@ -44,9 +52,11 @@ This is the intended experience, not an example of a currently working feature.
 
 - **Kotlin/JVM and Java 21** for the application.
 - **Compose Desktop and Material 3** for the interface.
-- **LangChain4j** for the AI service, conversation context, and tool calling.
-- **Ollama** for locally hosted inference.
-- **Woovi sandbox** as the first gateway.
+- **LangChain4j** for the planned AI service, conversation context, and tool calling.
+- **Ollama** for planned locally hosted inference.
+- **Woovi sandbox** as the planned first gateway.
+
+Target integration architecture:
 
 ```text
 Compose Desktop → ChatViewModel → LangChain4j ↔ Ollama
@@ -63,8 +73,9 @@ Payment links and statuses come from gateway responses. Gateway credentials stay
 in the adapter configuration, outside model context. Local inference still requires
 network access to Woovi for payment operations.
 
-Start with one Gradle application under `desktop/`, with clear `ui`, `state`,
-`agent`, `payments`, `config`, and `storage` packages. The Compose Desktop structure
+The project uses one Gradle application under `desktop/`. The scaffold contains
+`ui`, `state`, and the `agent` interface; `payments`, `config`, and `storage` will
+arrive with their implementations. The Compose Desktop structure
 and restrained dark theme of [MindGraph](https://github.com/iagxferreira/mindgraph)
 are references for the desktop experience.
 
@@ -95,11 +106,30 @@ details, and support refresh and saved selection. Switching applies between chat
 requests; payment tools require verified model support. Missing models and
 unreachable endpoints appear as actionable states rather than hard-coded choices.
 
-## Development prerequisites
+## Build and run
 
-Once the application scaffold lands, development will require Java 21, the checked-in
-Gradle wrapper, Ollama, and a model verified with the project's tool-calling smoke
-test. Build/run commands will be documented when they exist.
+Install **JDK 21** and point `JAVA_HOME` to it. The Gradle wrapper is checked in;
+no separate Gradle installation is required. Use JDK 21 to run Gradle as well as
+compile the app; the pinned Gradle 8.11.1 wrapper does not support running on JDK 25.
+
+From the repository root:
+
+```sh
+./desktop/gradlew -p desktop build
+./desktop/gradlew -p desktop test
+./desktop/gradlew -p desktop run
+```
+
+Or, from `desktop/`, use `./gradlew build`, `./gradlew test`, and `./gradlew run`.
+The first build downloads Gradle and Maven dependencies. Running the UI requires a
+graphical desktop session. The current app and tests need neither Ollama nor Woovi
+credentials and do not call external APIs.
+
+The GitHub Actions workflow builds and tests on Linux with Java 21. Test reports
+are generated in `desktop/build/reports/tests/test/index.html`.
+
+For future live-model checks, use an Ollama model verified with the project's
+tool-calling smoke test once that integration lands.
 
 For gateway testing, create a separate account at
 [Woovi sandbox](https://app.woovi-sandbox.com/) and obtain sandbox API credentials.

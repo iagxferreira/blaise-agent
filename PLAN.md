@@ -55,7 +55,7 @@ the UI, rather than parsing generated prose for links or charge identifiers.
 
 ## Milestones
 
-### 0. Public project foundation — current milestone
+### 0. Public project foundation
 
 - [x] Publish the public GitHub repository: https://github.com/iagxferreira/blaise-agent.
 - [x] Write README, implementation plan, and agent/contributor guidelines.
@@ -65,13 +65,24 @@ the UI, rather than parsing generated prose for links or charge identifiers.
 **Acceptance:** Public repository contains accurate planning-stage documentation,
 with scoped commits and no credentials or generated artifacts.
 
-### 1. Runnable Compose Desktop foundation
+### 1. Runnable Compose Desktop foundation — implementation delivered; visual review pending
 
-- Add Gradle wrapper, Kotlin/JVM, Java 21, Compose Desktop, and Material 3.
-- Use MindGraph's desktop patterns as a reference for window, theme, and state.
-- Build sidebar, empty conversation, message list, composer, and settings surface.
-- Introduce chat domain/state with a replaceable agent interface.
-- Add GitHub Actions for build and unit tests; document working local commands.
+- [x] Add Gradle wrapper, Kotlin/JVM, Java 21, Compose Desktop, and Material 3.
+- [x] Use MindGraph's desktop patterns as a reference for window, theme, and state.
+- [x] Build sidebar, empty conversation, message list, composer, and settings surface.
+- [x] Introduce chat domain/state with a replaceable agent interface.
+- [x] Add GitHub Actions for build and unit tests; document working local commands.
+- [ ] Manually review the running UI, including keyboard input and window resizing.
+- [ ] Verify the first remote GitHub Actions run after publishing the scaffold.
+
+The initial slice has a runnable shell and eight passing offline conversation-state
+tests. The default agent is unavailable, so sending is disabled and drafts are
+preserved. Settings is informational; it does not accept or persist credentials.
+Ollama/LangChain4j are the next integration. No gateway or model calls are made.
+
+Local build/test and process startup were verified with JDK 21. Automated screen
+capture was denied by the desktop session, so appearance and interactive behavior
+have not been visually verified. This milestone is not marked complete yet.
 
 **Acceptance:** A clean checkout builds and tests with the wrapper. The app opens
 locally, input works, and the UI remains responsive. Temporary demo behavior is
