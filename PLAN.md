@@ -72,22 +72,28 @@ with scoped commits and no credentials or generated artifacts.
 - [x] Build sidebar, empty conversation, message list, composer, and settings surface.
 - [x] Introduce chat domain/state with a replaceable agent interface.
 - [ ] Add build and unit-test automation after the desktop foundation is stable.
-- [ ] Manually review the running UI, including keyboard input and window resizing.
+- [ ] Manually review the running UI, including keyboard input, sidebar collapse,
+  hover/focus states, and window resizing.
 
-The initial slice has a runnable shell and eight passing offline conversation-state
-tests. The default agent is unavailable, so sending is disabled and drafts are
-preserved. Settings is informational; it does not accept or persist credentials.
-Ollama/LangChain4j are the next integration. No gateway or model calls are made.
+The foundation has a runnable shell and eight passing offline conversation-state
+tests. Ollama and LangChain4j now provide local streaming chat; Woovi, credential
+storage, and persistence are not integrated. Settings does not accept or persist
+credentials yet.
 
-Local build/test and process startup were verified with JDK 21. Automated screen
-capture was denied by the desktop session, so appearance and interactive behavior
-have not been visually verified. This milestone is not marked complete yet.
+Local build/test and process startup were verified with JDK 21. The new sidebar and
+control states have Pencil references, but live keyboard, pointer, and resize review
+remain pending. This milestone is not marked complete yet.
 
 **Acceptance:** A clean checkout builds and tests with the wrapper. The app opens
 locally, input works, and the UI remains responsive. Temporary demo behavior is
 explicitly labeled until connected to the agent.
 
 ### 2. Ollama startup and conversational agent — initial connection delivered
+
+UI refinement: expanded/compact sidebar and shared control states are implemented.
+`design/blaise.pen` contains corresponding screen variants, reusable sidebars, and
+a control-state reference. Live keyboard, pointer, and resize review is still required;
+compilation and Pencil validation do not replace that manual check.
 
 - [x] Check endpoint health with a bounded timeout off the UI thread.
 - [x] Show a startup toast for reachable/unreachable Ollama and no-model states.

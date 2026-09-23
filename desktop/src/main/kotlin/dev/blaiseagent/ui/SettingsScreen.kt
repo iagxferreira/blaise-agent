@@ -15,11 +15,13 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,6 +42,7 @@ fun SettingsScreen(
     models: List<OllamaModel>,
     selectedModel: String?,
     canSwitchModel: Boolean,
+    refreshing: Boolean,
     onSelectModel: (String) -> Unit,
     onRefresh: () -> Unit,
     onBack: () -> Unit,
@@ -51,10 +54,10 @@ fun SettingsScreen(
         Column(Modifier.widthIn(max = 760.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(24.dp)) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Your workspace, your way.", fontSize = 28.sp, fontWeight = FontWeight.SemiBold)
-                Text("Connections and credentials will live here.", color = Muted, fontSize = 14.sp)
+                Text("Manage local models and gateway connections.", color = Muted, fontSize = 14.sp)
             }
             SettingsCard("Ollama", "LOCAL INFERENCE") {
-                ConnectionSummary(connection)
+                ConnectionSummary(if (refreshing) null else connection)
                 OutlinedTextField(
                     value = endpoint,
                     onValueChange = {},
@@ -65,10 +68,20 @@ fun SettingsScreen(
                 )
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text("Installed models", fontWeight = FontWeight.Medium, fontSize = 13.sp, modifier = Modifier.weight(1f))
-                    TextButton(onClick = onRefresh) { Text("Refresh") }
+                    ActionButton(
+                        if (refreshing) "Refreshing…" else "Refresh", onRefresh,
+                        icon = Icons.Outlined.Refresh, enabled = canSwitchModel, loading = refreshing,
+                    )
                 }
                 if (models.isEmpty()) {
-                    Text("No local models found. Install one with `ollama pull <model>`.", color = Muted, fontSize = 13.sp)
+                    Text(
+                        when {
+                            refreshing -> "Loading installed models…"
+                            connection != OllamaConnection.Ready -> "Reconnect to Ollama and refresh the model list."
+                            else -> "No local models found. Install one with ollama pull <model>."
+                        },
+                        color = Muted, fontSize = 13.sp,
+                    )
                 } else {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         models.forEach { model ->
@@ -76,7 +89,11 @@ fun SettingsScreen(
                         }
                     }
                 }
-                Text("Choose a model for the next request. Active responses continue on their current model.", color = Muted, fontSize = 13.sp, lineHeight = 21.sp)
+                Text(
+                    if (!canSwitchModel && !refreshing) "Model controls are paused until the current response finishes."
+                    else "Choose the model for your next request.",
+                    color = Muted, fontSize = 13.sp, lineHeight = 21.sp,
+                )
             }
             SettingsCard("Woovi", "SANDBOX FIRST") {
                 Text("Woovi sandbox is not connected yet.", color = Muted, fontSize = 14.sp)
@@ -89,7 +106,7 @@ fun SettingsScreen(
                 Text("Planned: save · replace · remove · test connection", color = MaterialTheme.colorScheme.primary, fontSize = 12.sp)
             }
             Text("Conversations and drafts currently live in memory and are cleared when the app closes.", color = Muted, fontSize = 12.sp, lineHeight = 20.sp)
-            TextButton(onClick = onBack) { Text("← Back to chat") }
+            ActionButton("Back to chat", onBack, icon = Icons.AutoMirrored.Outlined.ArrowBack, style = ControlStyle.Ghost)
             Spacer(Modifier.height(8.dp))
         }
     }
@@ -105,7 +122,7 @@ private fun ConnectionSummary(connection: OllamaConnection?) {
         ) {
             Surface(
                 Modifier.size(8.dp),
-                color = if (connected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                color = if (connection == null) Muted else if (connected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
                 shape = RoundedCornerShape(50),
             ) { }
         }
@@ -123,11 +140,11 @@ private fun ConnectionSummary(connection: OllamaConnection?) {
 
 @Composable
 private fun ModelRow(model: OllamaModel, selected: Boolean, canSelect: Boolean, onSelect: (String) -> Unit) {
-    Surface(
-        onClick = { if (canSelect) onSelect(model.name) },
-        color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(10.dp),
-        border = BorderStroke(1.dp, if (selected) MaterialTheme.colorScheme.primary else Border),
+    ControlSurface(
+        onClick = { onSelect(model.name) },
+        enabled = canSelect,
+        selected = selected,
+        style = ControlStyle.Secondary,
     ) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {

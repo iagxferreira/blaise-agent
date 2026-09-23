@@ -24,6 +24,13 @@ uses the selected model for chat. Woovi, credential storage, and conversation
 persistence are not connected yet. Drafts and conversations still live in memory
 and disappear when the app closes.
 
+The sidebar can collapse from a 248 px conversation list to a 72 px icon rail.
+Use the chevron to expand it, or the Conversations icon to reopen the list.
+Icon actions have tooltips and accessible labels. Shared controls provide hover,
+pressed, keyboard-focus, selected, disabled, and loading treatments. The header's
+Development preview label is informational; its tooltip explains preview limits.
+Refresh and model selection are unavailable while a response is running.
+
 See [PLAN.md](PLAN.md) for milestones and acceptance criteria and [AGENTS.md](AGENTS.md)
 for development conventions.
 

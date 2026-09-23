@@ -18,11 +18,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.ArrowUpward
+import androidx.compose.material.icons.outlined.Computer
+import androidx.compose.material.icons.outlined.Stop
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
@@ -102,14 +104,13 @@ fun ChatScreen(
                         },
                     )
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        TextButton(onClick = onSettings) {
-                            Text(if (state.agentAvailable) "Agent connected" else "No model connected", color = Muted, fontSize = 12.sp)
-                        }
+                        ActionButton(if (state.agentAvailable) "Local model" else "Connect model", onSettings,
+                            icon = Icons.Outlined.Computer, style = ControlStyle.Ghost)
                         Spacer(Modifier.weight(1f))
                         if (state.generatingConversationId != null) {
-                            TextButton(onClick = onCancel) { Text("Stop response") }
+                            ActionButton("Stop", onCancel, icon = Icons.Outlined.Stop)
                         } else {
-                            Button(onClick = onSend, enabled = canSend, shape = RoundedCornerShape(10.dp)) { Text("Send ↑") }
+                            ActionButton("Send", onSend, enabled = canSend, icon = Icons.Outlined.ArrowUpward, style = ControlStyle.Primary)
                         }
                     }
                 }
@@ -133,7 +134,7 @@ private fun Welcome(onDraft: (String) -> Unit, modifier: Modifier) {
         Text("LOCAL INTELLIGENCE. CLEAR INTENT.", color = Accent, fontSize = 10.sp, letterSpacing = 2.sp)
         Text("A clearer way to\nmanage payments.", fontSize = 38.sp, lineHeight = 46.sp, fontWeight = FontWeight.SemiBold)
         Text(
-            "Your workspace starts here. Draft a request below while we build\nthe connection to Ollama and Woovi sandbox.",
+            "Chat with your local model. Woovi payment operations are coming next.",
             color = Muted,
             fontSize = 14.sp,
             lineHeight = 22.sp,
@@ -149,12 +150,10 @@ private fun Welcome(onDraft: (String) -> Unit, modifier: Modifier) {
 
 @Composable
 private fun Suggestion(title: String, subtitle: String, prompt: String, onDraft: (String) -> Unit, modifier: Modifier) {
-    Surface(
+    ControlSurface(
         onClick = { onDraft(prompt) },
         modifier = modifier,
-        color = Raised,
-        border = BorderStroke(1.dp, Border),
-        shape = RoundedCornerShape(12.dp),
+        style = ControlStyle.Secondary,
     ) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(title, fontSize = 13.sp, fontWeight = FontWeight.Medium)
