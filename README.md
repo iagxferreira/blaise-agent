@@ -110,10 +110,20 @@ store is unavailable or locked, the app will offer session-only use rather than
 silently saving plaintext. Keys must never enter chat history, model context,
 ordinary preferences, exports, or logs.
 
-Ollama settings load installed models from `GET /api/tags`, display their basic
-details, refresh the list, and allow switching between models when no response is
-in flight. The startup toast reports whether Ollama is reachable and whether models
-are available. Saved selection and payment-tool capability checks are upcoming.
+Ollama settings provide an editable endpoint, a Test connection action, dynamic
+model discovery from `GET /api/tags`, refresh, and model switching when no response
+is in flight. A failed endpoint test leaves the current chat connection unchanged.
+Saved selection and payment-tool capability checks are upcoming.
+
+Woovi sandbox API keys can now be saved, replaced, and removed through Settings. On
+Linux, Blaise uses Secret Service through `secret-tool`; if that secure store is
+unavailable, the app does not silently write plaintext and reports that session-only
+credentials are required. The key is passed as Woovi's `Authorization` header
+without adding a `Bearer` prefix.
+
+Settings separates Woovi **Sandbox** and **Live** environments, with independent
+secure credential slots and base URLs. Live mode is visibly marked as the real-money
+environment; the first payment flow remains sandbox-focused.
 
 ## Build and run
 

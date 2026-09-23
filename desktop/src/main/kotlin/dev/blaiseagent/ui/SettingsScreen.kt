@@ -22,10 +22,16 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.util.Locale
@@ -34,6 +40,7 @@ import dev.blaiseagent.ui.theme.Muted
 import dev.blaiseagent.ui.theme.Raised
 import dev.blaiseagent.agent.OllamaConnection
 import dev.blaiseagent.agent.OllamaModel
+import dev.blaiseagent.config.WooviEnvironment
 
 @Composable
 fun SettingsScreen(
@@ -43,8 +50,17 @@ fun SettingsScreen(
     selectedModel: String?,
     canSwitchModel: Boolean,
     refreshing: Boolean,
+    onEndpointChange: (String) -> Unit,
+    onTestConnection: () -> Unit,
     onSelectModel: (String) -> Unit,
     onRefresh: () -> Unit,
+    wooviCredentialSaved: Boolean,
+    wooviEnvironment: WooviEnvironment,
+    credentialAvailable: Boolean,
+    credentialBusy: Boolean,
+    onSaveWooviKey: (String) -> Unit,
+    onRemoveWooviKey: () -> Unit,
+    onSelectWooviEnvironment: (WooviEnvironment) -> Unit,
     onBack: () -> Unit,
 ) {
     Column(
@@ -60,12 +76,19 @@ fun SettingsScreen(
                 ConnectionSummary(if (refreshing) null else connection)
                 OutlinedTextField(
                     value = endpoint,
-                    onValueChange = {},
-                    readOnly = true,
+                    onValueChange = onEndpointChange,
                     label = { Text("Ollama endpoint") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                 )
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    ActionButton(
+                        if (refreshing) "Testing…" else "Test connection",
+                        onTestConnection,
+                        enabled = canSwitchModel,
+                        loading = refreshing,
+                    )
+                }
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text("Installed models", fontWeight = FontWeight.Medium, fontSize = 13.sp, modifier = Modifier.weight(1f))
                     ActionButton(
@@ -96,14 +119,67 @@ fun SettingsScreen(
                 )
             }
             SettingsCard("Woovi", "SANDBOX FIRST") {
-                Text("Woovi sandbox is not connected yet.", color = Muted, fontSize = 14.sp)
+                var apiKey by remember { mutableStateOf("") }
+                Text("Environment", fontWeight = FontWeight.Medium, fontSize = 13.sp)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    WooviEnvironment.entries.forEach { environment ->
+                        ActionButton(
+                            environment.label,
+                            onClick = { onSelectWooviEnvironment(environment) },
+                            selected = environment == wooviEnvironment,
+                            enabled = !credentialBusy,
+                            style = if (environment == WooviEnvironment.Production) ControlStyle.Secondary else ControlStyle.Ghost,
+                        )
+                    }
+                }
                 Text(
-                    "Credentials will be stored in your operating system’s secure credential store. Until that integration lands, no API key is requested or saved.",
+                    "${wooviEnvironment.baseUrl} · ${if (wooviEnvironment == WooviEnvironment.Sandbox) "Safe for testing" else "Real money environment"}",
+                    color = if (wooviEnvironment == WooviEnvironment.Production) MaterialTheme.colorScheme.error else Muted,
+                    fontSize = 12.sp,
+                )
+                Text(
+                    if (wooviCredentialSaved) "${wooviEnvironment.label} API key is saved in your OS credential store."
+                    else "Save your ${wooviEnvironment.label.lowercase()} Woovi AppID to enable payment operations.",
+                    color = Muted,
+                    fontSize = 14.sp,
+                )
+                Text(
+                    "Woovi expects the AppID in the Authorization header. This key is never sent to Ollama, stored in chat history, or written to ordinary preferences.",
                     color = Muted,
                     fontSize = 13.sp,
                     lineHeight = 21.sp,
                 )
-                Text("Planned: save · replace · remove · test connection", color = MaterialTheme.colorScheme.primary, fontSize = 12.sp)
+                if (credentialAvailable) {
+                    OutlinedTextField(
+                        value = apiKey,
+                        onValueChange = { apiKey = it },
+                        enabled = !credentialBusy,
+                        visualTransformation = PasswordVisualTransformation(),
+                        label = { Text(if (wooviCredentialSaved) "Enter a replacement key" else "Woovi ${wooviEnvironment.label.lowercase()} API key") },
+                        supportingText = { Text("Stored securely by your operating system") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ActionButton(
+                            if (credentialBusy) "Saving…" else if (wooviCredentialSaved) "Replace key" else "Save key",
+                            onClick = {
+                                if (apiKey.isNotBlank()) {
+                                    onSaveWooviKey(apiKey)
+                                    apiKey = ""
+                                }
+                            },
+                            enabled = apiKey.isNotBlank() && !credentialBusy,
+                            loading = credentialBusy,
+                            style = ControlStyle.Primary,
+                        )
+                        if (wooviCredentialSaved) {
+                            TextButton(onClick = onRemoveWooviKey, enabled = !credentialBusy) { Text("Remove") }
+                        }
+                    }
+                } else {
+                    Text("Secure credential storage is unavailable. Use session-only credentials when the gateway adapter is enabled.", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
+                }
             }
             Text("Conversations and drafts currently live in memory and are cleared when the app closes.", color = Muted, fontSize = 12.sp, lineHeight = 20.sp)
             ActionButton("Back to chat", onBack, icon = Icons.AutoMirrored.Outlined.ArrowBack, style = ControlStyle.Ghost)

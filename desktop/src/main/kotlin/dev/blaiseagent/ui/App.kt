@@ -36,6 +36,10 @@ import dev.blaiseagent.agent.OllamaChatAgent
 import dev.blaiseagent.agent.OllamaClient
 import dev.blaiseagent.agent.OllamaConnection
 import dev.blaiseagent.agent.OllamaModel
+import dev.blaiseagent.config.CredentialKey
+import dev.blaiseagent.config.CredentialStore
+import dev.blaiseagent.config.CredentialStoreFactory
+import dev.blaiseagent.config.WooviEnvironment
 import dev.blaiseagent.state.ChatViewModel
 import dev.blaiseagent.ui.theme.Accent
 import dev.blaiseagent.ui.theme.Background
@@ -49,19 +53,25 @@ fun App(model: ChatViewModel, ollamaClient: OllamaClient) {
     val state by model.state.collectAsState()
     var settingsOpen by remember { mutableStateOf(false) }
     var collapsed by remember { mutableStateOf(false) }
+    var activeOllamaClient by remember { mutableStateOf(ollamaClient) }
+    var ollamaEndpoint by remember { mutableStateOf(ollamaClient.endpoint) }
     var ollamaConnection by remember { mutableStateOf<OllamaConnection?>(null) }
     var models by remember { mutableStateOf<List<OllamaModel>>(emptyList()) }
     var selectedModel by remember { mutableStateOf<String?>(null) }
     var refreshing by remember { mutableStateOf(false) }
+    var credentialStore by remember { mutableStateOf<CredentialStore?>(null) }
+    var wooviCredentialSaved by remember { mutableStateOf(false) }
+    var credentialBusy by remember { mutableStateOf(false) }
+    var wooviEnvironment by remember { mutableStateOf(WooviEnvironment.Sandbox) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
-    suspend fun refreshOllama() {
+    suspend fun refreshOllama(client: OllamaClient = activeOllamaClient) {
         if (refreshing || model.state.value.generatingConversationId != null) return
         refreshing = true
         model.setAgent(null)
         val message = try {
-            val connection = ollamaClient.checkConnection()
+            val connection = client.checkConnection()
             ollamaConnection = connection
             when (connection) {
                 OllamaConnection.Ready -> {
@@ -71,7 +81,7 @@ fun App(model: ChatViewModel, ollamaClient: OllamaClient) {
                     if (availableModel == null) {
                         "Ollama is running, but no local models are installed"
                     } else {
-                        model.setAgent(OllamaChatAgent(ollamaClient.endpoint, availableModel.name))
+                        model.setAgent(OllamaChatAgent(client.endpoint, availableModel.name))
                         "Ollama is running · ${models.size} model${if (models.size == 1) "" else "s"} available"
                     }
                 }
@@ -97,10 +107,104 @@ fun App(model: ChatViewModel, ollamaClient: OllamaClient) {
     fun selectModel(name: String) {
         if (refreshing || model.state.value.generatingConversationId != null) return
         selectedModel = name
-        model.setAgent(OllamaChatAgent(ollamaClient.endpoint, name))
+        model.setAgent(OllamaChatAgent(activeOllamaClient.endpoint, name))
     }
 
-    LaunchedEffect(ollamaClient) { refreshOllama() }
+    fun testEndpoint(candidate: String) {
+        if (refreshing || model.state.value.generatingConversationId != null) return
+        scope.launch {
+            val normalized = candidate.trim()
+            if (normalized.isBlank()) {
+                snackbarHostState.showSnackbar("Enter an Ollama endpoint first")
+                return@launch
+            }
+            val candidateClient = runCatching { OllamaClient(normalized) }.getOrNull()
+            if (candidateClient == null) {
+                snackbarHostState.showSnackbar("That Ollama endpoint is not valid")
+                return@launch
+            }
+            refreshing = true
+            try {
+                when (candidateClient.checkConnection()) {
+                    OllamaConnection.Ready -> {
+                        val discovered = candidateClient.listModels()
+                        activeOllamaClient = candidateClient
+                        ollamaEndpoint = candidateClient.endpoint
+                        ollamaConnection = OllamaConnection.Ready
+                        models = discovered
+                        val availableModel = discovered.firstOrNull { it.name == selectedModel } ?: discovered.firstOrNull()
+                        selectedModel = availableModel?.name
+                        if (availableModel == null) {
+                            model.setAgent(null)
+                            snackbarHostState.showSnackbar("Connected, but no local models are installed")
+                        } else {
+                            model.setAgent(OllamaChatAgent(candidateClient.endpoint, availableModel.name))
+                            snackbarHostState.showSnackbar("Connection successful · ${discovered.size} model${if (discovered.size == 1) "" else "s"} available")
+                        }
+                    }
+                    is OllamaConnection.Unavailable -> snackbarHostState.showSnackbar("Could not connect to that Ollama endpoint")
+                }
+            } catch (_: Exception) {
+                snackbarHostState.showSnackbar("Connected to Ollama, but model discovery failed")
+            } finally {
+                refreshing = false
+            }
+        }
+    }
+
+    LaunchedEffect(ollamaClient) { refreshOllama(ollamaClient) }
+    LaunchedEffect(Unit) {
+        credentialStore = CredentialStoreFactory.create()
+        wooviCredentialSaved = runCatching {
+            credentialStore?.contains(wooviEnvironment.credentialKey) == true
+        }.getOrDefault(false)
+    }
+
+    fun selectWooviEnvironment(environment: WooviEnvironment) {
+        if (credentialBusy) return
+        wooviEnvironment = environment
+        scope.launch {
+            wooviCredentialSaved = runCatching {
+                credentialStore?.contains(environment.credentialKey) == true
+            }.getOrDefault(false)
+        }
+    }
+
+    fun saveWooviKey(value: String) {
+        val store = credentialStore
+        if (store == null) {
+            scope.launch { snackbarHostState.showSnackbar("Secure credential storage is unavailable") }
+            return
+        }
+        scope.launch {
+            credentialBusy = true
+            try {
+                store.write(wooviEnvironment.credentialKey, value)
+                wooviCredentialSaved = true
+                snackbarHostState.showSnackbar("Woovi sandbox API key saved securely")
+            } catch (_: Exception) {
+                snackbarHostState.showSnackbar("Could not save the Woovi API key securely")
+            } finally {
+                credentialBusy = false
+            }
+        }
+    }
+
+    fun removeWooviKey() {
+        val store = credentialStore ?: return
+        scope.launch {
+            credentialBusy = true
+            try {
+                store.delete(wooviEnvironment.credentialKey)
+                wooviCredentialSaved = false
+                snackbarHostState.showSnackbar("Woovi sandbox API key removed")
+            } catch (_: Exception) {
+                snackbarHostState.showSnackbar("Could not remove the Woovi API key")
+            } finally {
+                credentialBusy = false
+            }
+        }
+    }
 
     BlaiseTheme {
         Surface(
@@ -141,13 +245,22 @@ fun App(model: ChatViewModel, ollamaClient: OllamaClient) {
                     if (settingsOpen) {
                         SettingsScreen(
                             connection = ollamaConnection,
-                            endpoint = ollamaClient.endpoint,
+                            endpoint = ollamaEndpoint,
                             models = models,
                             selectedModel = selectedModel,
                             canSwitchModel = !refreshing && state.generatingConversationId == null,
                             refreshing = refreshing,
                             onSelectModel = ::selectModel,
+                            onEndpointChange = { ollamaEndpoint = it },
+                            onTestConnection = { testEndpoint(ollamaEndpoint) },
                             onRefresh = { scope.launch { refreshOllama() } },
+                            wooviCredentialSaved = wooviCredentialSaved,
+                            wooviEnvironment = wooviEnvironment,
+                            credentialAvailable = credentialStore != null,
+                            credentialBusy = credentialBusy,
+                            onSaveWooviKey = ::saveWooviKey,
+                            onRemoveWooviKey = ::removeWooviKey,
+                            onSelectWooviEnvironment = ::selectWooviEnvironment,
                             onBack = { settingsOpen = false },
                         )
                     } else {

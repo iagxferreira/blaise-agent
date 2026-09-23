@@ -99,6 +99,10 @@ compilation and Pencil validation do not replace that manual check.
 - [x] Show a startup toast for reachable/unreachable Ollama and no-model states.
 - [x] Discover models through `GET /api/tags` and use an available model for chat.
 - [x] Refresh installed models and switch the active model between requests.
+- [x] Edit the Ollama endpoint and test a candidate connection before adopting it.
+- [x] Add Linux Secret Service-backed Woovi sandbox key save, replace, and remove
+  actions with sanitized UI errors and no plaintext fallback.
+- [x] Separate Woovi Sandbox and Live environment selection and credential slots.
 - [x] Connect LangChain4j's streaming Ollama adapter to the chat state.
 - [ ] Distinguish checking, ready, unreachable, and incompatible model states in the
   persistent application state.
