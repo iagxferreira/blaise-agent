@@ -57,7 +57,7 @@ the UI, rather than parsing generated prose for links or charge identifiers.
 
 ### 0. Public project foundation — current milestone
 
-- [ ] Publish the public GitHub repository.
+- [x] Publish the public GitHub repository: https://github.com/iagxferreira/blaise-agent.
 - [x] Write README, implementation plan, and agent/contributor guidelines.
 - [x] Define atomic Conventional Commit workflow and local-data exclusions.
 - [ ] Select a license with the maintainer before distributing application releases.
