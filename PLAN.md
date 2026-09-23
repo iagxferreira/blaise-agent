@@ -92,6 +92,7 @@ explicitly labeled until connected to the agent.
 - [x] Check endpoint health with a bounded timeout off the UI thread.
 - [x] Show a startup toast for reachable/unreachable Ollama and no-model states.
 - [x] Discover models through `GET /api/tags` and use an available model for chat.
+- [x] Refresh installed models and switch the active model between requests.
 - [x] Connect LangChain4j's streaming Ollama adapter to the chat state.
 - [ ] Distinguish checking, ready, unreachable, and incompatible model states in the
   persistent application state.

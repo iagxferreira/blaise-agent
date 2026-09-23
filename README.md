@@ -17,12 +17,12 @@ conversation controls, editable drafts, example prompts, and a Settings screen.
 Conversation orchestration has offline tests for streaming, cancellation, isolation,
 and failure handling behind a replaceable agent interface.
 
-Ollama health detection, local model discovery, and LangChain4j streaming are now
-connected. On startup the app checks the local Ollama endpoint, shows a toast with
-the result, discovers installed models from `/api/tags`, and uses the first model
-for chat. Model switching, Woovi, credential storage, and conversation persistence
-are not connected yet. Settings shows the current Ollama state; drafts and
-conversations still live in memory and disappear when the app closes.
+Ollama health detection, local model discovery, model switching, and LangChain4j
+streaming are now connected. On startup the app checks the local Ollama endpoint,
+shows a toast with the result, discovers installed models from `/api/tags`, and
+uses the selected model for chat. Woovi, credential storage, and conversation
+persistence are not connected yet. Drafts and conversations still live in memory
+and disappear when the app closes.
 
 See [PLAN.md](PLAN.md) for milestones and acceptance criteria and [AGENTS.md](AGENTS.md)
 for development conventions.
@@ -103,10 +103,10 @@ store is unavailable or locked, the app will offer session-only use rather than
 silently saving plaintext. Keys must never enter chat history, model context,
 ordinary preferences, exports, or logs.
 
-Ollama settings load installed models from `GET /api/tags` and display their basic
-details. The startup toast reports whether Ollama is reachable and whether models
-are available. Refresh, saved selection, model switching, and payment-tool
-capability checks are upcoming.
+Ollama settings load installed models from `GET /api/tags`, display their basic
+details, refresh the list, and allow switching between models when no response is
+in flight. The startup toast reports whether Ollama is reachable and whether models
+are available. Saved selection and payment-tool capability checks are upcoming.
 
 ## Build and run
 

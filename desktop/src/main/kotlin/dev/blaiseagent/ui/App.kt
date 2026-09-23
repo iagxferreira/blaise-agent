@@ -31,6 +31,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -53,6 +54,7 @@ import dev.blaiseagent.ui.theme.Border
 import dev.blaiseagent.ui.theme.Muted
 import dev.blaiseagent.ui.theme.Raised
 import dev.blaiseagent.ui.theme.Sidebar
+import kotlinx.coroutines.launch
 
 @Composable
 fun App(model: ChatViewModel, ollamaClient: OllamaClient) {
@@ -60,20 +62,23 @@ fun App(model: ChatViewModel, ollamaClient: OllamaClient) {
     var settingsOpen by remember { mutableStateOf(false) }
     var ollamaConnection by remember { mutableStateOf<OllamaConnection?>(null) }
     var models by remember { mutableStateOf<List<OllamaModel>>(emptyList()) }
+    var selectedModel by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
-    LaunchedEffect(ollamaClient) {
+    suspend fun refreshOllama() {
         val connection = ollamaClient.checkConnection()
         ollamaConnection = connection
         when (connection) {
             OllamaConnection.Ready -> {
                 models = runCatching { ollamaClient.listModels() }.getOrDefault(emptyList())
-                val firstModel = models.firstOrNull()
-                if (firstModel == null) {
+                val availableModel = models.firstOrNull { it.name == selectedModel } ?: models.firstOrNull()
+                selectedModel = availableModel?.name
+                if (availableModel == null) {
                     model.setAgent(null)
                     snackbarHostState.showSnackbar("Ollama is running, but no local models are installed")
                 } else {
-                    model.setAgent(OllamaChatAgent(ollamaClient.endpoint, firstModel.name))
+                    model.setAgent(OllamaChatAgent(ollamaClient.endpoint, availableModel.name))
                     snackbarHostState.showSnackbar("Ollama is running · ${models.size} model${if (models.size == 1) "" else "s"} available")
                 }
             }
@@ -84,12 +89,21 @@ fun App(model: ChatViewModel, ollamaClient: OllamaClient) {
         }
     }
 
+    fun selectModel(name: String) {
+        if (state.generatingConversationId != null) return
+        selectedModel = name
+        model.setAgent(OllamaChatAgent(ollamaClient.endpoint, name))
+    }
+
+    LaunchedEffect(ollamaClient) { refreshOllama() }
+
     BlaiseTheme {
         Box(Modifier.fillMaxSize().background(Background)) {
             Surface(Modifier.fillMaxSize(), color = Background) {
                 Row {
                 Sidebar(
                     state = state,
+                    selectedModel = selectedModel,
                     settingsOpen = settingsOpen,
                     onNewChat = { model.newConversation(); settingsOpen = false },
                     onSelectChat = { model.selectConversation(it); settingsOpen = false },
@@ -112,7 +126,16 @@ fun App(model: ChatViewModel, ollamaClient: OllamaClient) {
                     }
                     HorizontalDivider()
                     if (settingsOpen) {
-                        SettingsScreen(ollamaConnection, models, onBack = { settingsOpen = false })
+                        SettingsScreen(
+                            connection = ollamaConnection,
+                            endpoint = ollamaClient.endpoint,
+                            models = models,
+                            selectedModel = selectedModel,
+                            canSwitchModel = state.generatingConversationId == null,
+                            onSelectModel = ::selectModel,
+                            onRefresh = { scope.launch { refreshOllama() } },
+                            onBack = { settingsOpen = false },
+                        )
                     } else {
                         ChatScreen(state, model::updateDraft, model::send, model::cancelResponse) {
                             settingsOpen = true
@@ -132,6 +155,7 @@ fun App(model: ChatViewModel, ollamaClient: OllamaClient) {
 @Composable
 private fun Sidebar(
     state: ChatState,
+    selectedModel: String?,
     settingsOpen: Boolean,
     onNewChat: () -> Unit,
     onSelectChat: (String) -> Unit,
@@ -180,8 +204,20 @@ private fun Sidebar(
         }
         Surface(color = Raised, shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, Border)) {
             Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                Text("Built for local AI", color = Accent, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                Text("Ollama connection is coming next.", color = Muted, fontSize = 12.sp, lineHeight = 18.sp)
+                Text(
+                    if (state.agentAvailable) "Connected to local AI" else "Local AI unavailable",
+                    color = Accent,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                )
+                Text(
+                    selectedModel ?: "Start Ollama to enable chat.",
+                    color = Muted,
+                    fontSize = 12.sp,
+                    lineHeight = 18.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
         Spacer(Modifier.height(16.dp))
