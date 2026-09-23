@@ -10,6 +10,14 @@ returning payment links, and checking charge status.
 The name honors Blaise Pascal, who invented the Pascaline to help his father with
 tax calculations.
 
+## Desktop preview
+
+![Blaise with Qwen3 4B, an expanded Woovi Sandbox connection result, conversation context, and response/tool timings](design/blaise-woovi-chat.png)
+
+User-captured desktop session showing the connection-check flow. Credentials are
+hidden; the displayed durations are observations from this machine, not benchmarks.
+Payment creation and durable conversation storage are still planned.
+
 ## Project status
 
 **Desktop foundation.** The app now launches with a dark chat workspace, new/switch
