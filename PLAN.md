@@ -71,9 +71,8 @@ with scoped commits and no credentials or generated artifacts.
 - [x] Use MindGraph's desktop patterns as a reference for window, theme, and state.
 - [x] Build sidebar, empty conversation, message list, composer, and settings surface.
 - [x] Introduce chat domain/state with a replaceable agent interface.
-- [x] Add GitHub Actions for build and unit tests; document working local commands.
+- [ ] Add build and unit-test automation after the desktop foundation is stable.
 - [ ] Manually review the running UI, including keyboard input and window resizing.
-- [ ] Verify the first remote GitHub Actions run after publishing the scaffold.
 
 The initial slice has a runnable shell and eight passing offline conversation-state
 tests. The default agent is unavailable, so sending is disabled and drafts are

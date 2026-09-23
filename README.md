@@ -125,8 +125,7 @@ The first build downloads Gradle and Maven dependencies. Running the UI requires
 graphical desktop session. The current app and tests need neither Ollama nor Woovi
 credentials and do not call external APIs.
 
-The GitHub Actions workflow builds and tests on Linux with Java 21. Test reports
-are generated in `desktop/build/reports/tests/test/index.html`.
+Test reports are generated in `desktop/build/reports/tests/test/index.html`.
 
 For future live-model checks, use an Ollama model verified with the project's
 tool-calling smoke test once that integration lands.

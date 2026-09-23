@@ -87,9 +87,9 @@ and `./gradlew run`. Gradle 8.11.1 is pinned with a distribution checksum. The U
 needs a graphical session; tests do not. Dependencies may download on a first build.
 
 Use `kotlin.test` and coroutine test utilities. Default tests must run without
-Ollama, gateway credentials, or external network APIs. CI runs `build` on Linux/JDK
-21; its remote execution must be verified separately from local checks. Also check
-documentation consistency and `git diff --check`.
+Ollama, gateway credentials, or external network APIs. When automation is
+reintroduced, it should run `build` on Linux/JDK 21. Also check documentation
+consistency and `git diff --check`.
 
 Prioritize behavioral tests for money validation, tool dispatch, state transitions,
 Woovi HTTP mapping/errors, persistence, and duplicate/uncertain operation handling.
