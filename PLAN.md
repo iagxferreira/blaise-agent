@@ -103,6 +103,8 @@ compilation and Pencil validation do not replace that manual check.
 - [x] Add Linux Secret Service-backed Woovi sandbox key save, replace, and remove
   actions with sanitized UI errors and no plaintext fallback.
 - [x] Separate Woovi Sandbox and Live environment selection and credential slots.
+- [x] Test saved Woovi credentials through the selected environment's company endpoint.
+- [x] Expose the saved-key connection check as a guarded LangChain tool.
 - [x] Connect LangChain4j's streaming Ollama adapter to the chat state.
 - [ ] Distinguish checking, ready, unreachable, and incompatible model states in the
   persistent application state.

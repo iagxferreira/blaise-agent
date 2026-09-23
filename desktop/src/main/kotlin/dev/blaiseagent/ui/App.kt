@@ -36,10 +36,13 @@ import dev.blaiseagent.agent.OllamaChatAgent
 import dev.blaiseagent.agent.OllamaClient
 import dev.blaiseagent.agent.OllamaConnection
 import dev.blaiseagent.agent.OllamaModel
+import dev.blaiseagent.agent.WooviConnectionTool
 import dev.blaiseagent.config.CredentialKey
 import dev.blaiseagent.config.CredentialStore
 import dev.blaiseagent.config.CredentialStoreFactory
 import dev.blaiseagent.config.WooviEnvironment
+import dev.blaiseagent.payments.WooviClient
+import dev.blaiseagent.payments.WooviConnection
 import dev.blaiseagent.state.ChatViewModel
 import dev.blaiseagent.ui.theme.Accent
 import dev.blaiseagent.ui.theme.Background
@@ -65,6 +68,12 @@ fun App(model: ChatViewModel, ollamaClient: OllamaClient) {
     var wooviEnvironment by remember { mutableStateOf(WooviEnvironment.Sandbox) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    val wooviConnectionTool = remember(credentialStore) {
+        credentialStore?.let { WooviConnectionTool(it, { wooviEnvironment }) }
+    }
+
+    fun createAgent(client: OllamaClient, modelName: String): OllamaChatAgent =
+        OllamaChatAgent(client.endpoint, modelName, wooviConnectionTool = wooviConnectionTool)
 
     suspend fun refreshOllama(client: OllamaClient = activeOllamaClient) {
         if (refreshing || model.state.value.generatingConversationId != null) return
@@ -81,7 +90,7 @@ fun App(model: ChatViewModel, ollamaClient: OllamaClient) {
                     if (availableModel == null) {
                         "Ollama is running, but no local models are installed"
                     } else {
-                        model.setAgent(OllamaChatAgent(client.endpoint, availableModel.name))
+                        model.setAgent(createAgent(client, availableModel.name))
                         "Ollama is running · ${models.size} model${if (models.size == 1) "" else "s"} available"
                     }
                 }
@@ -107,7 +116,7 @@ fun App(model: ChatViewModel, ollamaClient: OllamaClient) {
     fun selectModel(name: String) {
         if (refreshing || model.state.value.generatingConversationId != null) return
         selectedModel = name
-        model.setAgent(OllamaChatAgent(activeOllamaClient.endpoint, name))
+        model.setAgent(createAgent(activeOllamaClient, name))
     }
 
     fun testEndpoint(candidate: String) {
@@ -138,7 +147,7 @@ fun App(model: ChatViewModel, ollamaClient: OllamaClient) {
                             model.setAgent(null)
                             snackbarHostState.showSnackbar("Connected, but no local models are installed")
                         } else {
-                            model.setAgent(OllamaChatAgent(candidateClient.endpoint, availableModel.name))
+                            model.setAgent(createAgent(candidateClient, availableModel.name))
                             snackbarHostState.showSnackbar("Connection successful · ${discovered.size} model${if (discovered.size == 1) "" else "s"} available")
                         }
                     }
@@ -153,6 +162,11 @@ fun App(model: ChatViewModel, ollamaClient: OllamaClient) {
     }
 
     LaunchedEffect(ollamaClient) { refreshOllama(ollamaClient) }
+    LaunchedEffect(credentialStore, selectedModel) {
+        if (credentialStore != null && selectedModel != null && ollamaConnection == OllamaConnection.Ready) {
+            model.setAgent(createAgent(activeOllamaClient, selectedModel!!))
+        }
+    }
     LaunchedEffect(Unit) {
         credentialStore = CredentialStoreFactory.create()
         wooviCredentialSaved = runCatching {
@@ -181,7 +195,7 @@ fun App(model: ChatViewModel, ollamaClient: OllamaClient) {
             try {
                 store.write(wooviEnvironment.credentialKey, value)
                 wooviCredentialSaved = true
-                snackbarHostState.showSnackbar("Woovi sandbox API key saved securely")
+                snackbarHostState.showSnackbar("Woovi ${wooviEnvironment.label.lowercase()} API key saved securely")
             } catch (_: Exception) {
                 snackbarHostState.showSnackbar("Could not save the Woovi API key securely")
             } finally {
@@ -197,9 +211,32 @@ fun App(model: ChatViewModel, ollamaClient: OllamaClient) {
             try {
                 store.delete(wooviEnvironment.credentialKey)
                 wooviCredentialSaved = false
-                snackbarHostState.showSnackbar("Woovi sandbox API key removed")
+                snackbarHostState.showSnackbar("Woovi ${wooviEnvironment.label.lowercase()} API key removed")
             } catch (_: Exception) {
                 snackbarHostState.showSnackbar("Could not remove the Woovi API key")
+            } finally {
+                credentialBusy = false
+            }
+        }
+    }
+
+    fun testWooviConnection() {
+        val store = credentialStore
+        if (store == null || credentialBusy) return
+        scope.launch {
+            credentialBusy = true
+            try {
+                val key = store.read(wooviEnvironment.credentialKey)
+                if (key.isNullOrBlank()) {
+                    snackbarHostState.showSnackbar("Save a ${wooviEnvironment.label.lowercase()} Woovi API key first")
+                } else {
+                    when (WooviClient(wooviEnvironment).testConnection(key)) {
+                        WooviConnection.Ready -> snackbarHostState.showSnackbar("Woovi ${wooviEnvironment.label.lowercase()} connection successful")
+                        is WooviConnection.Unavailable -> snackbarHostState.showSnackbar("Woovi ${wooviEnvironment.label.lowercase()} connection failed")
+                    }
+                }
+            } catch (_: Exception) {
+                snackbarHostState.showSnackbar("Could not read the Woovi API key securely")
             } finally {
                 credentialBusy = false
             }
@@ -261,6 +298,7 @@ fun App(model: ChatViewModel, ollamaClient: OllamaClient) {
                             onSaveWooviKey = ::saveWooviKey,
                             onRemoveWooviKey = ::removeWooviKey,
                             onSelectWooviEnvironment = ::selectWooviEnvironment,
+                            onTestWooviConnection = ::testWooviConnection,
                             onBack = { settingsOpen = false },
                         )
                     } else {

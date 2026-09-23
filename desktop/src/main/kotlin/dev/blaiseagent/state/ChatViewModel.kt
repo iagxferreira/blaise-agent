@@ -1,6 +1,7 @@
 package dev.blaiseagent.state
 
 import dev.blaiseagent.agent.ChatAgent
+import dev.blaiseagent.agent.AgentEvent
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -61,8 +62,22 @@ class ChatViewModel(
         // Enter the try/finally before returning, so immediate cancellation also cleans up state.
         responseJob = scope.launch(start = CoroutineStart.UNDISPATCHED) {
             try {
-                currentAgent.stream(context).collect { delta ->
-                    updateMessage(conversation.id, reply.id) { it.copy(text = it.text + delta) }
+                currentAgent.streamEvents(context).collect { event ->
+                    when (event) {
+                        is AgentEvent.Text -> updateMessage(conversation.id, reply.id) {
+                            it.copy(text = it.text + event.value)
+                        }
+                        is AgentEvent.ToolCall -> insertBeforeMessage(
+                            conversation.id,
+                            reply.id,
+                            ChatMessage(UUID.randomUUID().toString(), MessageRole.Assistant, "Calling ${event.name}…", MessageStatus.ToolCall),
+                        )
+                        is AgentEvent.ToolResult -> insertBeforeMessage(
+                            conversation.id,
+                            reply.id,
+                            ChatMessage(UUID.randomUUID().toString(), MessageRole.Assistant, event.value, MessageStatus.ToolResult),
+                        )
+                    }
                 }
                 updateMessage(conversation.id, reply.id) {
                     it.copy(status = if (it.text.isBlank()) MessageStatus.Failed else MessageStatus.Complete)
@@ -110,6 +125,14 @@ class ChatViewModel(
     private fun updateMessage(conversationId: String, messageId: String, transform: (ChatMessage) -> ChatMessage) {
         updateConversation(conversationId) { conversation ->
             conversation.copy(messages = conversation.messages.map { if (it.id == messageId) transform(it) else it })
+        }
+    }
+
+    private fun insertBeforeMessage(conversationId: String, messageId: String, message: ChatMessage) {
+        updateConversation(conversationId) { conversation ->
+            val index = conversation.messages.indexOfFirst { it.id == messageId }
+            if (index < 0) conversation
+            else conversation.copy(messages = conversation.messages.toMutableList().apply { add(index, message) })
         }
     }
 }

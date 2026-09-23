@@ -165,7 +165,15 @@ private fun Suggestion(title: String, subtitle: String, prompt: String, onDraft:
 @Composable
 private fun Message(message: ChatMessage) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(if (message.role == MessageRole.User) "YOU" else "BLAISE", color = Accent, fontSize = 10.sp, letterSpacing = 1.sp)
+        Text(
+            when (message.status) {
+                MessageStatus.ToolCall, MessageStatus.ToolResult -> "TOOL"
+                else -> if (message.role == MessageRole.User) "YOU" else "BLAISE"
+            },
+            color = if (message.status == MessageStatus.ToolResult) Accent else Muted,
+            fontSize = 10.sp,
+            letterSpacing = 1.sp,
+        )
         if (message.text.isNotEmpty()) {
             androidx.compose.foundation.text.selection.SelectionContainer {
                 Text(message.text, fontSize = 15.sp, lineHeight = 24.sp)
@@ -173,6 +181,8 @@ private fun Message(message: ChatMessage) {
         }
         when (message.status) {
             MessageStatus.Streaming -> Text("Writing…", color = Muted, fontSize = 12.sp)
+            MessageStatus.ToolCall -> Text("Running securely…", color = Muted, fontSize = 12.sp)
+            MessageStatus.ToolResult -> Unit
             MessageStatus.Cancelled -> Text("Response stopped", color = Muted, fontSize = 12.sp)
             MessageStatus.Failed -> Text("Couldn’t finish this response. Please try again.", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
             MessageStatus.Complete -> Unit

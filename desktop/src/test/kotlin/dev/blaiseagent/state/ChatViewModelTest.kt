@@ -1,6 +1,7 @@
 package dev.blaiseagent.state
 
 import dev.blaiseagent.agent.ChatAgent
+import dev.blaiseagent.agent.AgentEvent
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
@@ -191,5 +192,31 @@ class ChatViewModelTest {
 
         assertTrue(stopped)
         assertNull(model.state.value.generatingConversationId)
+    }
+
+    @Test
+    fun toolActivityAppearsBeforeTheFinalAssistantReply() = runTest {
+        val agent = object : ChatAgent {
+            override fun stream(messages: List<ChatMessage>) = flowOf("unused")
+
+            override fun streamEvents(messages: List<ChatMessage>) = flowOf(
+                AgentEvent.ToolCall("test_woovi_connection"),
+                AgentEvent.ToolResult("test_woovi_connection", "Sandbox Woovi connection successful."),
+                AgentEvent.Text("Connection is ready."),
+            )
+        }
+        ChatViewModel(agent, StandardTestDispatcher(testScheduler)).use { model ->
+            model.updateDraft("Test my Woovi connection")
+            model.send()
+            runCurrent()
+
+            val messages = model.state.value.activeConversation.messages
+            assertEquals(listOf(MessageRole.User, MessageRole.Assistant, MessageRole.Assistant, MessageRole.Assistant), messages.map { it.role })
+            assertEquals(MessageStatus.ToolCall, messages[1].status)
+            assertEquals("Calling test_woovi_connection…", messages[1].text)
+            assertEquals(MessageStatus.ToolResult, messages[2].status)
+            assertEquals("Sandbox Woovi connection successful.", messages[2].text)
+            assertEquals("Connection is ready.", messages[3].text)
+        }
     }
 }

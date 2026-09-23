@@ -1,7 +1,7 @@
 package dev.blaiseagent.state
 
 enum class MessageRole { User, Assistant }
-enum class MessageStatus { Streaming, Complete, Cancelled, Failed }
+enum class MessageStatus { Streaming, Complete, ToolCall, ToolResult, Cancelled, Failed }
 
 data class ChatMessage(
     val id: String,

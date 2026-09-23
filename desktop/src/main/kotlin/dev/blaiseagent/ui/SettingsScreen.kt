@@ -61,6 +61,7 @@ fun SettingsScreen(
     onSaveWooviKey: (String) -> Unit,
     onRemoveWooviKey: () -> Unit,
     onSelectWooviEnvironment: (WooviEnvironment) -> Unit,
+    onTestWooviConnection: () -> Unit,
     onBack: () -> Unit,
 ) {
     Column(
@@ -176,6 +177,15 @@ fun SettingsScreen(
                         if (wooviCredentialSaved) {
                             TextButton(onClick = onRemoveWooviKey, enabled = !credentialBusy) { Text("Remove") }
                         }
+                    }
+                    if (wooviCredentialSaved) {
+                        ActionButton(
+                            if (credentialBusy) "Testing…" else "Test connection",
+                            onTestWooviConnection,
+                            enabled = !credentialBusy,
+                            loading = credentialBusy,
+                            style = ControlStyle.Secondary,
+                        )
                     }
                 } else {
                     Text("Secure credential storage is unavailable. Use session-only credentials when the gateway adapter is enabled.", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)

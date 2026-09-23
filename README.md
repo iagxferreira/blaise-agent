@@ -123,7 +123,14 @@ without adding a `Bearer` prefix.
 
 Settings separates Woovi **Sandbox** and **Live** environments, with independent
 secure credential slots and base URLs. Live mode is visibly marked as the real-money
-environment; the first payment flow remains sandbox-focused.
+environment; the first payment flow remains sandbox-focused. A non-mutating
+connection test checks the selected environment's company endpoint using the saved
+AppID and never sends the key to Ollama or includes it in error messages.
+
+The same connection check is available from chat: with a saved key, ask the local
+model to "test my connection with the Woovi environment". The model can request only
+the fixed, no-argument connection tool; environment selection and credential access
+remain controlled by the application.
 
 ## Build and run
 
